@@ -1,0 +1,3 @@
+[submodule "submodules/SBJSON"]
+	path = submodules/SBJSON
+	url = git://github.com/stig/json-framework.git
