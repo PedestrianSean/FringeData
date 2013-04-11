@@ -1,9 +1,8 @@
 //
 //  NSURL+ApplicationPath.h
-//  Givit
 //
 //  Created by Sean Meiners on 2011/10/24.
-//  Copyright (c) 2011 __MyCompanyName__. All rights reserved.
+//  Copyright (c) 2012 Sean Meiners. All rights reserved.
 //
 
 #import <Foundation/Foundation.h>

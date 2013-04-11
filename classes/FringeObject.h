@@ -1,8 +1,8 @@
 //
 //  FringeObject.h
-//  Givit
 //
 //  Created by Sean Meiners on 2012/10/01.
+//  Copyright (c) 2012 Sean Meiners. All rights reserved.
 //
 //
 
@@ -21,6 +21,7 @@ NS_REQUIRES_PROPERTY_DEFINITIONS
 @property (nonatomic, readonly) NSString *uuid;
 
 + (NSURL*)defaultCommitPath;
++ (NSURL*)defaultIndexPath;
 + (NSSet*)indexedPropertyNames;
 + (NSURL*)indexURLForProperty:(NSString*)name withValue:(id)value forObject:(FringeObject*)object;
 

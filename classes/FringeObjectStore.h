@@ -1,8 +1,8 @@
 //
 //  FringeObjectStore.h
-//  Givit
 //
 //  Created by Sean Meiners on 2012/10/01.
+//  Copyright (c) 2012 Sean Meiners. All rights reserved.
 //
 //
 
@@ -28,7 +28,7 @@ typedef enum : NSUInteger {
 + (FringeObjectStore*)storeWithUUID:(NSString*)uuid atPath:(NSString*)path;
 + (FringeObjectStore*)storeWithRootObject:(FringeObject*)root atPath:(NSString*)path;
 
-+ (void)cleanIndexes;
+- (void)cleanIndexes;
 
 - (BOOL)setCommitPath:(NSString*)commitPath error:(NSError**)error;
 

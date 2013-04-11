@@ -1,9 +1,8 @@
 //
 //  NSObject+JSONSafety.h
-//  Givit
 //
 //  Created by Sean Meiners on 2012/07/11.
-//  Copyright (c) 2012 __MyCompanyName__. All rights reserved.
+//  Copyright (c) 2012 Sean Meiners. All rights reserved.
 //
 
 #import <Foundation/Foundation.h>

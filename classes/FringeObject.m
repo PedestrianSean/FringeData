@@ -1,8 +1,8 @@
 //
 //  FringeObject.m
-//  Givit
 //
 //  Created by Sean Meiners on 2012/10/01.
+//  Copyright (c) 2012 Sean Meiners. All rights reserved.
 //
 //
 
@@ -659,6 +659,10 @@ NSString *upperCaseFirst(NSString *str) {
 }
 
 + (NSURL*)defaultCommitPath {
+    return nil;
+}
+
++ (NSURL*)defaultIndexPath {
     return nil;
 }
 

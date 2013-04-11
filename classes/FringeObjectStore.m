@@ -1,8 +1,8 @@
 //
 //  FringeObjectStore.m
-//  Givit
 //
 //  Created by Sean Meiners on 2012/10/01.
+//  Copyright (c) 2012 Sean Meiners. All rights reserved.
 //
 //
 
@@ -259,7 +259,7 @@ BOOL isFringeObjectClass(Class clas) {
     if( ! json || ! [json isKindOfClass:[NSDictionary class]] ) {
         NSLog(@"Unparsable json in %@: %@", fullPath, rawStr);
         [self delete:NULL];
-        [FringeObjectStore cleanIndexes];
+        [self cleanIndexes];
         return nil;
     }
 
@@ -611,10 +611,13 @@ BOOL isFringeObjectClass(Class clas) {
     return YES;
 }
 
-+ (void)cleanIndexes:(NSURL*)storePath {
+- (void)cleanIndexes {
+    FringeObject *root = [self rootObject];
+    NSURL *indexPath = [[root class] defaultIndexPath];
+
     NSFileManager *fm = [[NSFileManager alloc] init];
     NSArray *resourceKeys = @[ NSURLIsReadableKey, NSURLIsRegularFileKey, NSURLIsSymbolicLinkKey ];
-    NSDirectoryEnumerator *dir = [fm enumeratorAtURL:[storePath fileURL]
+    NSDirectoryEnumerator *dir = [fm enumeratorAtURL:[indexPath fileURL]
                           includingPropertiesForKeys:resourceKeys
                                              options:NSDirectoryEnumerationSkipsHiddenFiles
                                         errorHandler:^BOOL(NSURL *url, NSError *error) {

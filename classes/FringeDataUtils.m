@@ -1,8 +1,8 @@
 //
 //  FringeDataUtils.m
-//  Givit
 //
 //  Created by Sean Meiners on 2012/10/04.
+//  Copyright (c) 2012 Sean Meiners. All rights reserved.
 //
 //
 
@@ -91,7 +91,7 @@ NSString *const kFringeDataItemDeleted = @"FringeDataItemDeleted";
         if( [[values objectForKey:NSURLIsSymbolicLinkKey] boolValue] ) {
             NSURL *real = [url URLByResolvingSymlinksInPath];
             if( ! [fm fileExistsAtPath:[real path]] ) {
-                [FringeObjectStore cleanIndexes];
+                [fm removeItemAtURL:url error:NULL];
                 continue;
             }
             url = real;
@@ -144,7 +144,7 @@ NSString *const kFringeDataItemDeleted = @"FringeDataItemDeleted";
             if( [[values objectForKey:NSURLIsSymbolicLinkKey] boolValue] ) {
                 NSURL *real = [url URLByResolvingSymlinksInPath];
                 if( ! [fm fileExistsAtPath:[real path]] ) {
-                    [FringeObjectStore cleanIndexes];
+                    [fm removeItemAtURL:url error:NULL];
                     continue;
                 }
                 url = real;

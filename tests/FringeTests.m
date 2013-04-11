@@ -1,3 +1,11 @@
+//
+//  FringeTests.m
+//
+//  Created by Sean Meiners
+//  Copyright (c) 2012 Sean Meiners. All rights reserved.
+//
+//
+
 #import <Foundation/Foundation.h>
 #import "FringeObjectStore.h"
 #import "FringeObject.h"
