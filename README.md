@@ -6,7 +6,7 @@ An easy-to-use replacement for CoreData
 CoreData is a pretty cool framework. I've had many uses for it and it's generally served my needs well.
 However, a while back I was working on a heavily-threaded application where the objects needed to
 be modified in a background processing thread as well as the UI thread. To do this in CoreData and not
-have it eventually throw an exception at you requires so much locking that your app will become unusably slow.
+have it eventually throw an exception required so much locking that my app became unusably slow.
 And thus FringeData was born. It was designed from the start to strike a balance between memory usage, speed,
 and thread-safety. You can safely read and write to a FringeDataObject from multiple threads and never have
 to worry about locking (it's handled for you). Also, since it uses JSON formatted files for its backing store
@@ -18,7 +18,7 @@ Advantages
 * FringeDataObject mimics NSManagedObject, so you can continue to use @dynamic properties
 * Only holds changed and recently accessed objects in memory in order to maintain a low footprint
 * Has simple begin/commit/rollback transactional ability
-* JSON backed for human-readable data files and trivialy property addition
+* JSON backed for human-readable data files and trivial property addition
 * FringeObjectStore(s) are reused, so there is never more than one instance representing a given backing store
 
 Disadvantages
