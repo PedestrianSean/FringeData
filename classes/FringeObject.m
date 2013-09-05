@@ -32,7 +32,7 @@ NSString *makeFileNameSafe(NSString *fileName)
         return @"";
     if( [newString lengthOfBytesUsingEncoding:NSUTF8StringEncoding] > NAME_MAX )
         newString = [NSString stringWithFormat:@"%d:%@:%@",
-                     [newString hash],
+                     (int)[newString hash],
                      [newString substringWithRange:NSMakeRange(0, 20)],
                      [newString substringWithRange:NSMakeRange([newString length] - 20, 20)]];
     return newString;
@@ -145,11 +145,13 @@ NSString *upperCaseFirst(NSString *str) {
 - (id)initWithStore:(FringeObjectStore*)store {
     //NSLog(@"%p [%@ %@]", self, NSStringFromClass([self class]), NSStringFromSelector(_cmd));
     if( (self = [self initCommon]) ) {
-        _jsonDataInternal = [NSMutableDictionary dictionaryWithCapacity:10];
-        [self setDefaultValues];
-        [_jsonDataInternal setObject:NSStringFromClass([self class]) forKey:@"class"];
-        [_jsonDataInternal setObject:[NSString stringWithNewUUID] forKey:@"uuid"];
         _store = store;
+        _jsonDataInternal = [NSMutableDictionary dictionaryWithCapacity:10];
+        [_store lockWriteSync:^{
+            [self setDefaultValues];
+            [self.jsonDataInternal setObject:NSStringFromClass([self class]) forKey:@"class"];
+            [self.jsonDataInternal setObject:[NSString stringWithNewUUID] forKey:@"uuid"];
+        }];
         [_store addChangedObject:self];
     }
     return self;
@@ -160,9 +162,11 @@ NSString *upperCaseFirst(NSString *str) {
     if( (self = [self initCommon]) ) {
         _store = store;
         _jsonDataInternal = [NSMutableDictionary dictionaryWithCapacity:10];
-        [self setDefaultValues];
-        if( dictionary )
-            [_jsonDataInternal addEntriesFromDictionary:dictionary];
+        [_store lockWriteSync:^{
+            [self setDefaultValues];
+            if( dictionary )
+                [self.jsonDataInternal addEntriesFromDictionary:dictionary];
+        }];
     }
     return self;
 }
@@ -173,10 +177,12 @@ NSString *upperCaseFirst(NSString *str) {
     if( (self = [self initCommon]) )
     {
         _jsonDataInternal = [NSMutableDictionary dictionaryWithCapacity:10];
-        [self setDefaultValues];
-        [_jsonDataInternal setObject:NSStringFromClass([self class]) forKey:@"class"];
-        [_jsonDataInternal setObject:[NSString stringWithNewUUID] forKey:@"uuid"];
+        [self.jsonDataInternal setObject:[NSString stringWithNewUUID] forKey:@"uuid"];
+        [self.jsonDataInternal setObject:NSStringFromClass([self class]) forKey:@"class"];
         _store = [FringeObjectStore storeWithRootObject:self atPath:nil];
+        [_store lockWriteSync:^{
+            [self setDefaultValues];
+        }];
     }
 
     return self;
@@ -662,10 +668,6 @@ NSString *upperCaseFirst(NSString *str) {
     return nil;
 }
 
-+ (NSURL*)defaultIndexPath {
-    return nil;
-}
-
 + (NSSet*)indexedPropertyNames {
     return nil;
 }
@@ -739,43 +741,31 @@ BOOL isFringeObjectProperty(Class clas) {
 }
 
 - (void)setUuidInternal:(NSString *)uuid {
-    @try {
-        [_store lockRead];
+    [_store lockWriteAsync:^{
         [_jsonDataInternal setObject:uuid forKey:@"uuid"];
         [self setChanged];
-    }
-    @finally {
-        [_store unlockRead];
-    }
+    }];
 }
 
 #define SYNC_START_GET() \
-@try { \
-    [_store lockRead]; \
-    if( propertyMetaData->flags.atomic ) \
-        objc_sync_enter(self)
+    [_store lockReadSync:^{ \
+        if( propertyMetaData->flags.atomic ) \
+            objc_sync_enter(self)
 
 #define SYNC_STOP_GET() \
-} \
-@finally { \
-    if( propertyMetaData->flags.atomic ) \
-        objc_sync_exit(self); \
-    [_store unlockRead]; \
-}
+        if( propertyMetaData->flags.atomic ) \
+            objc_sync_exit(self); \
+    }];
 
 #define SYNC_START_SET() \
-@try { \
-    [_store lockWrite]; \
-    if( propertyMetaData->flags.atomic ) \
-        objc_sync_enter(self)
+    [_store lockWriteAsync:^{ \
+        if( propertyMetaData->flags.atomic ) \
+            objc_sync_enter(self)
 
 #define SYNC_STOP_SET() \
-} \
-@finally { \
-    if( propertyMetaData->flags.atomic ) \
-        objc_sync_exit(self); \
-    [_store unlockWrite]; \
-}
+        if( propertyMetaData->flags.atomic ) \
+            objc_sync_exit(self); \
+    }];
 
 - (FringeObjectClassPropertyMetaData*)getPropertyMetaDataFor:(NSString*)property {
     for( Class clas = [self class]; clas != [NSObject class]; clas = [clas superclass] ) {
@@ -792,12 +782,13 @@ BOOL isFringeObjectProperty(Class clas) {
     FringeObjectClassPropertyMetaData *propertyMetaData = [self getPropertyMetaDataFor:key];
     if( ! propertyMetaData )
         return nil;
+    __block id obj = nil;
     SYNC_START_GET();
-    id obj = [_jsonDataInternal jsonObjectForKey:key];
+    obj = [_jsonDataInternal jsonObjectForKey:key];
     if( propertyMetaData->flags.weak )
-        return [(FringeWeakObject*)obj object];
-    return obj;
+        obj = [(FringeWeakObject*)obj object];
     SYNC_STOP_GET();
+    return obj;
 }
 
 - (void)setProperty:(NSString*)key value:(id)value
@@ -805,75 +796,78 @@ BOOL isFringeObjectProperty(Class clas) {
     FringeObjectClassPropertyMetaData *propertyMetaData = [self getPropertyMetaDataFor:key];
     if( ! propertyMetaData )
         return;
-    [self setChanged];
     if( propertyMetaData->flags.copy )
         value = [value copy];
     if( propertyMetaData->flags.weak )
         value = [FringeWeakObject weakObject:value];
     SYNC_START_SET();
     if( value )
-        [_jsonDataInternal setObject:value forKey:key];
+        [self.jsonDataInternal setObject:value forKey:key];
     else
-        [_jsonDataInternal removeObjectForKey:key];
+        [self.jsonDataInternal removeObjectForKey:key];
+    [self setChanged];
     SYNC_STOP_SET();
 }
 
 - (id)getObjectProperty {
     GET_KEY(nil);
+    __block id obj = nil;
     SYNC_START_GET();
-    id obj = [_jsonDataInternal jsonObjectForKey:key];
+    obj = [_jsonDataInternal jsonObjectForKey:key];
     if( propertyMetaData->flags.weak )
-        return [(FringeWeakObject*)obj object];
-    return obj;
+        obj = [(FringeWeakObject*)obj object];
     SYNC_STOP_GET();
+    return obj;
 }
 
 - (void)setObjectProperty:(id)value {
     GET_KEY();
-    [self setChanged];
     if( propertyMetaData->flags.copy )
         value = [value copy];
     if( propertyMetaData->flags.weak )
         value = [FringeWeakObject weakObject:value];
     SYNC_START_SET();
     if( value )
-        [_jsonDataInternal setObject:value forKey:key];
+        [self.jsonDataInternal setObject:value forKey:key];
     else
-        [_jsonDataInternal removeObjectForKey:key];
+        [self.jsonDataInternal removeObjectForKey:key];
+    [self setChanged];
     SYNC_STOP_SET();
 }
 
 - (id)getFringeObjectProperty {
     GET_KEY(nil);
+    __block id obj = nil;
     SYNC_START_GET();
     NSString *uuid = [_jsonDataInternal jsonStringForKey:key];
-    return [_store objectWithUUID:uuid];
+    obj = [_store objectWithUUID:uuid];
     SYNC_STOP_GET();
+    return obj;
 }
 
 - (void)setFringeObjectProperty:(FringeObject*)value {
     GET_KEY();
-    [self setChanged];
     SYNC_START_SET();
     NSString *uuid = [_jsonDataInternal jsonStringForKey:key];
     if( uuid ) {
         if( [uuid isEqualToString:value.uuid] )
             return;
-        [_store removeObjectWithUUID:uuid];
+        [self.store removeObjectWithUUID:uuid];
     }
     if( value  ) {
-        [_store addObject:value];
-        [_jsonDataInternal setObject:value.uuid forKey:key];
+        [self.store addObject:value];
+        [self.jsonDataInternal setObject:value.uuid forKey:key];
     }
     else
-        [_jsonDataInternal removeObjectForKey:key];
+        [self.jsonDataInternal removeObjectForKey:key];
+    [self setChanged];
     SYNC_STOP_SET();
 }
 
 - (id)getDataProperty {
     GET_KEY(nil);
 
-    id value = nil;
+    __block id value = nil;
     SYNC_START_GET();
     value = [_jsonDataInternal jsonObjectForKey:key];
     SYNC_STOP_GET();
@@ -886,12 +880,12 @@ BOOL isFringeObjectProperty(Class clas) {
     GET_KEY();
 
     value = [value base64Encoding];
-    [self setChanged];
     SYNC_START_SET();
     if( value )
-        [_jsonDataInternal setObject:value forKey:key];
+        [self.jsonDataInternal setObject:value forKey:key];
     else
-        [_jsonDataInternal removeObjectForKey:key];
+        [self.jsonDataInternal removeObjectForKey:key];
+    [self setChanged];
     SYNC_STOP_SET();
 }
 
@@ -901,7 +895,7 @@ BOOL isFringeObjectProperty(Class clas) {
     if( ! [propertyMetaData->transformerClass allowsReverseTransformation] )
         return nil;
 
-    id value = nil;
+    __block id value = nil;
     SYNC_START_GET();
     value = [_jsonDataInternal jsonObjectForKey:key];
     SYNC_STOP_GET();
@@ -942,28 +936,30 @@ BOOL isFringeObjectProperty(Class clas) {
     if( [propertyMetaData->transformerClass transformedValueClass] == [NSData class] )
         transformedValue = [[NSString alloc] initWithData:transformedValue encoding:NSUTF8StringEncoding];
 
-    [self setChanged];
     SYNC_START_SET();
     if( transformedValue )
-        [_jsonDataInternal setObject:transformedValue forKey:key];
+        [self.jsonDataInternal setObject:transformedValue forKey:key];
     else
-        [_jsonDataInternal removeObjectForKey:key];
+        [self.jsonDataInternal removeObjectForKey:key];
+    [self setChanged];
     SYNC_STOP_SET();
 }
 
 #define PRIMITIVE_PROPERTY(TYPE, NAME)  \
 - (TYPE)get##NAME##Property { \
     GET_KEY(0); \
+    __block TYPE value; \
     SYNC_START_GET(); \
-    return [_jsonDataInternal json##NAME##ForKey:key]; \
+    value = [_jsonDataInternal json##NAME##ForKey:key]; \
     SYNC_STOP_GET(); \
+    return value; \
 } \
 \
 - (void)set##NAME##Property:(TYPE)value { \
     GET_KEY(); \
-    [self setChanged]; \
     SYNC_START_SET(); \
-    [_jsonDataInternal setObject:@(value) forKey:key]; \
+    [self.jsonDataInternal setObject:@(value) forKey:key]; \
+    [self setChanged]; \
     SYNC_STOP_SET(); \
 }
 
@@ -988,10 +984,12 @@ PRIMITIVE_PROPERTY(int32_t, Int32);
     if( ! _store )
         return 0;
     GET_KEY(0);
+    __block NSUInteger count = 0;
     SYNC_START_GET();
     GET_NSSET_UUIDS(NO);
-    return [uuids count];
+    count = [uuids count];
     SYNC_STOP_GET();
+    return count;
 }
 
 - (NSSet*)getNSSetProperty
@@ -999,16 +997,17 @@ PRIMITIVE_PROPERTY(int32_t, Int32);
     if( ! _store )
         return nil;
     GET_KEY(nil);
+    __block NSMutableSet *items = nil;
     SYNC_START_GET();
     GET_NSSET_UUIDS(NO);
-    NSMutableSet *items = [NSMutableSet setWithCapacity:[uuids count]];
+    items = [NSMutableSet setWithCapacity:[uuids count]];
     for( NSString *uuid in uuids ) {
         id object = [_store objectWithUUID:uuid];
         if( object )
             [items addObject:object];
     }
-    return items;
     SYNC_STOP_GET();
+    return items;
 }
 
 - (void)setNSSetProperty:(NSSet*)value
@@ -1018,14 +1017,14 @@ PRIMITIVE_PROPERTY(int32_t, Int32);
     NSMutableArray *uuidsOld = (NSMutableArray*)[_jsonDataInternal jsonArrayForKey:key];
     NSMutableArray *uuidsNew = [NSMutableArray arrayWithCapacity:[value count]];
     for( FringeObject *fo in value ) {
-        [_store addObject:fo];
+        [self.store addObject:fo];
         [uuidsNew addObject:fo.uuid];
         [uuidsOld removeObject:fo.uuid];
     }
     [self setChanged];
-    [_jsonDataInternal setObject:uuidsNew forKey:key];
+    [self.jsonDataInternal setObject:uuidsNew forKey:key];
     for( NSString *uuid in uuidsOld )
-        [_store removeObjectWithUUID:uuid];
+        [self.store removeObjectWithUUID:uuid];
     SYNC_STOP_SET();
 }
 
@@ -1034,9 +1033,11 @@ PRIMITIVE_PROPERTY(int32_t, Int32);
     GET_KEY();
     SYNC_START_SET();
     GET_NSSET_UUIDS(YES);
-    [_store addObject:value];
-    [self setChanged];
-    [uuids addObject:value.uuid];
+    if( ! [uuids containsObject:value.uuid] ) {
+        [self.store addObject:value];
+        [uuids addObject:value.uuid];
+        [self setChanged];
+    }
     SYNC_STOP_SET();
 }
 
@@ -1045,7 +1046,7 @@ PRIMITIVE_PROPERTY(int32_t, Int32);
     GET_KEY();
     SYNC_START_SET();
     GET_NSSET_UUIDS(NO);
-    [_store removeObjectWithUUID:value.uuid];
+    [self.store removeObjectWithUUID:value.uuid];
     [self setChanged];
     SYNC_STOP_SET();
 }
@@ -1057,7 +1058,7 @@ PRIMITIVE_PROPERTY(int32_t, Int32);
     GET_NSSET_UUIDS(YES);
     NSMutableArray *valuesUUIDs = [NSMutableArray arrayWithCapacity:[values count]];
     for( FringeObject *fo in values ) {
-        [_store addObject:fo];
+        [self.store addObject:fo];
         [valuesUUIDs addObject:fo.uuid];
     }
     [self setChanged];
@@ -1071,7 +1072,7 @@ PRIMITIVE_PROPERTY(int32_t, Int32);
     SYNC_START_SET();
     GET_NSSET_UUIDS(NO);
     for( FringeObject *fo in values )
-        [_store removeObjectWithUUID:fo.uuid];
+        [self.store removeObjectWithUUID:fo.uuid];
     [self setChanged];
     SYNC_STOP_SET();
 }
@@ -1083,10 +1084,12 @@ PRIMITIVE_PROPERTY(int32_t, Int32);
     if( ! _store )
         return 0;
     GET_KEY(0);
+    __block NSUInteger count = 0;
     SYNC_START_GET();
     GET_NSSET_UUIDS(NO);
-    return [uuids count];
+    count = [uuids count];
     SYNC_STOP_GET();
+    return count;
 }
 
 - (FringeObject*)getNSOrderedSetObjectAtIndex:(NSUInteger)index
@@ -1094,10 +1097,12 @@ PRIMITIVE_PROPERTY(int32_t, Int32);
     if( ! _store )
         return nil;
     GET_KEY(nil);
+    __block FringeObject *obj = nil;
     SYNC_START_GET();
     GET_NSSET_UUIDS(NO);
-    return [_store objectWithUUID:[uuids objectAtIndex:index]];
+    obj = [_store objectWithUUID:[uuids objectAtIndex:index]];
     SYNC_STOP_GET();
+    return obj;
 }
 
 - (NSOrderedSet*)getNSOrderedSetObjectsAtIndexes:(NSIndexSet*)indexes
@@ -1105,16 +1110,17 @@ PRIMITIVE_PROPERTY(int32_t, Int32);
     if( ! _store )
         return nil;
     GET_KEY(nil);
+    __block NSMutableOrderedSet *items = nil;
     SYNC_START_GET();
     GET_NSSET_UUIDS(NO);
-    NSMutableOrderedSet *items = [NSMutableOrderedSet orderedSetWithCapacity:[indexes count]];
+    items = [NSMutableOrderedSet orderedSetWithCapacity:[indexes count]];
     for( NSString *uuid in [uuids objectsAtIndexes:indexes] ) {
         id object = [_store objectWithUUID:uuid];
         if( object )
             [items addObject:object];
     }
-    return items;
     SYNC_STOP_GET();
+    return items;
 }
 
 - (NSOrderedSet*)getNSOrderedSetProperty
@@ -1122,16 +1128,17 @@ PRIMITIVE_PROPERTY(int32_t, Int32);
     if( ! _store )
         return nil;
     GET_KEY(nil);
+    __block NSMutableOrderedSet *items = nil;
     SYNC_START_GET();
     GET_NSSET_UUIDS(NO);
-    NSMutableOrderedSet *items = [NSMutableOrderedSet orderedSetWithCapacity:[uuids count]];
+    items = [NSMutableOrderedSet orderedSetWithCapacity:[uuids count]];
     for( NSString *uuid in uuids ) {
         id object = [_store objectWithUUID:uuid];
         if( object )
             [items addObject:object];
     }
-    return items;
     SYNC_STOP_GET();
+    return items;
 }
 
 - (void)setNSOrderedSetProperty:(NSOrderedSet*)value
@@ -1141,14 +1148,14 @@ PRIMITIVE_PROPERTY(int32_t, Int32);
     NSMutableArray *uuidsOld = (NSMutableArray*)[_jsonDataInternal jsonArrayForKey:key];
     NSMutableArray *uuidsNew = [NSMutableArray arrayWithCapacity:[value count]];
     for( FringeObject *fo in value ) {
-        [_store addObject:fo];
+        [self.store addObject:fo];
         [uuidsNew addObject:fo.uuid];
         [uuidsOld removeObject:fo.uuid];
     }
     [self setChanged];
-    [_jsonDataInternal setObject:uuidsNew forKey:key];
+    [self.jsonDataInternal setObject:uuidsNew forKey:key];
     for( NSString *uuid in uuidsOld )
-        [_store removeObjectWithUUID:uuid];
+        [self.store removeObjectWithUUID:uuid];
     SYNC_STOP_SET();
 }
 
@@ -1157,9 +1164,11 @@ PRIMITIVE_PROPERTY(int32_t, Int32);
     GET_KEY();
     SYNC_START_SET();
     GET_NSSET_UUIDS(YES);
-    [_store addObject:value];
-    [self setChanged];
-    [uuids addObject:value.uuid];
+    if( ! [uuids containsObject:value.uuid] ) {
+        [self.store addObject:value];
+        [self setChanged];
+        [uuids addObject:value.uuid];
+    }
     SYNC_STOP_SET();
 }
 
@@ -1168,7 +1177,7 @@ PRIMITIVE_PROPERTY(int32_t, Int32);
     GET_KEY();
     SYNC_START_SET();
     GET_NSSET_UUIDS(NO);
-    [_store removeObjectWithUUID:[uuids objectAtIndex:idx]];
+    [self.store removeObjectWithUUID:[uuids objectAtIndex:idx]];
     [self setChanged];
     SYNC_STOP_SET();
 }
@@ -1178,7 +1187,7 @@ PRIMITIVE_PROPERTY(int32_t, Int32);
     GET_KEY();
     SYNC_START_SET();
     GET_NSSET_UUIDS(NO);
-    [_store removeObjectWithUUID:object.uuid];
+    [self.store removeObjectWithUUID:object.uuid];
     [self setChanged];
     SYNC_STOP_SET();
 }
@@ -1188,10 +1197,10 @@ PRIMITIVE_PROPERTY(int32_t, Int32);
     GET_KEY();
     SYNC_START_SET();
     GET_NSSET_UUIDS(NO);
-    [_store addObject:value];
+    [self.store addObject:value];
     NSString *oldUUID = [uuids objectAtIndex:idx];
     [uuids replaceObjectAtIndex:idx withObject:value.uuid];
-    [_store removeObjectWithUUID:oldUUID];
+    [self.store removeObjectWithUUID:oldUUID];
     [self setChanged];
     SYNC_STOP_SET();
 }
@@ -1201,7 +1210,7 @@ PRIMITIVE_PROPERTY(int32_t, Int32);
     GET_KEY();
     SYNC_START_SET();
     GET_NSSET_UUIDS(YES);
-    [_store addObject:value];
+    [self.store addObject:value];
     [self setChanged];
     [uuids insertObject:value.uuid atIndex:idx];
     SYNC_STOP_SET();
@@ -1214,7 +1223,7 @@ PRIMITIVE_PROPERTY(int32_t, Int32);
     GET_NSSET_UUIDS(YES);
     NSMutableArray *valuesUUIDs = [NSMutableArray arrayWithCapacity:[values count]];
     for( FringeObject *fo in values ) {
-        [_store addObject:fo];
+        [self.store addObject:fo];
         [valuesUUIDs addObject:fo.uuid];
     }
     [self setChanged];
@@ -1232,7 +1241,7 @@ PRIMITIVE_PROPERTY(int32_t, Int32);
         [removedUUIDs addObject:[uuids objectAtIndex:idx]];
     }];
     for( NSString *uuid in removedUUIDs )
-        [_store removeObjectWithUUID:uuid];
+        [self.store removeObjectWithUUID:uuid];
     [self setChanged];
     SYNC_STOP_SET();
 }
@@ -1248,12 +1257,12 @@ PRIMITIVE_PROPERTY(int32_t, Int32);
         [removedUUIDs addObject:[uuids objectAtIndex:idx]];
     }];
     for( FringeObject *fo in values ) {
-        [_store addObject:fo];
+        [self.store addObject:fo];
         [valuesUUIDs addObject:fo.uuid];
     }
     [uuids replaceObjectsAtIndexes:indexes withObjects:valuesUUIDs];
     for( NSString *uuid in removedUUIDs )
-        [_store removeObjectWithUUID:uuid];
+        [self.store removeObjectWithUUID:uuid];
     [self setChanged];
     SYNC_STOP_SET();
 }
@@ -1265,7 +1274,7 @@ PRIMITIVE_PROPERTY(int32_t, Int32);
     GET_NSSET_UUIDS(YES);
     NSMutableArray *valuesUUIDs = [NSMutableArray arrayWithCapacity:[values count]];
     for( FringeObject *fo in values ) {
-        [_store addObject:fo];
+        [self.store addObject:fo];
         [valuesUUIDs addObject:fo.uuid];
     }
     [self setChanged];
@@ -1279,7 +1288,7 @@ PRIMITIVE_PROPERTY(int32_t, Int32);
     SYNC_START_SET();
     GET_NSSET_UUIDS(NO);
     for( FringeObject *fo in values )
-        [_store removeObjectWithUUID:fo.uuid];
+        [self.store removeObjectWithUUID:fo.uuid];
     [self setChanged];
     SYNC_STOP_SET();
 }

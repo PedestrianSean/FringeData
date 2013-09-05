@@ -91,7 +91,7 @@ NSString *const kFringeDataItemDeleted = @"FringeDataItemDeleted";
         if( [[values objectForKey:NSURLIsSymbolicLinkKey] boolValue] ) {
             NSURL *real = [url URLByResolvingSymlinksInPath];
             if( ! [fm fileExistsAtPath:[real path]] ) {
-                [fm removeItemAtURL:url error:NULL];
+                [FringeObjectStore cleanIndexes];
                 continue;
             }
             url = real;
@@ -144,7 +144,7 @@ NSString *const kFringeDataItemDeleted = @"FringeDataItemDeleted";
             if( [[values objectForKey:NSURLIsSymbolicLinkKey] boolValue] ) {
                 NSURL *real = [url URLByResolvingSymlinksInPath];
                 if( ! [fm fileExistsAtPath:[real path]] ) {
-                    [fm removeItemAtURL:url error:NULL];
+                    [FringeObjectStore cleanIndexes];
                     continue;
                 }
                 url = real;
@@ -207,7 +207,9 @@ NSString *const kFringeDataItemDeleted = @"FringeDataItemDeleted";
     NSError *error = nil;
 
     if( store.rootObject != object ) {
-        [store removeObjectWithUUID:object.uuid];
+        [store lockWriteSync:^{
+            [store removeObjectWithUUID:object.uuid];
+        }];
         if( [store commit:&error] )
             return YES;
     }

@@ -16,6 +16,10 @@
 #import "FringeWeakObject.h"
 #import "NSURL+ApplicationPath.h"
 
+#ifndef lcl_log
+#define lcl_log(a, b, format, ...) NSLog(format, ##__VA_ARGS__)
+#endif
+
 NSString *__strong const kFringeObjectStoreFileExtension = @"fds";
 NSString *__strong const kFringeDataErrorDomain = @"FringeDataErrorDomain";
 
@@ -25,12 +29,12 @@ NSString *__strong const kFringeDataErrorDomain = @"FringeDataErrorDomain";
  
                             s_knownStores
                                     |
-                                WeakObject
+                                FringeWeakObject
                             FringeObjectStore
                             //       ||     \\
                       objects        ||      changedObjects
                             \        ||     //
-                        WeakObject   ^^    //
+                        FringeWeakObject   ^^    //
                                 FringeObject
 
  This accomplishes a couple of goals:
@@ -52,6 +56,7 @@ static NSString *__strong const RootKey = @"root";
 @interface FringeObject (Internal)
 
 @property (atomic, strong) NSMutableDictionary *jsonDataInternal;
+@property (nonatomic, strong) FringeObjectStore *store;
 @property (atomic, strong) NSDictionary *indexPaths;
 
 - (void)setUuidInternal:(NSString *)uuid;
@@ -71,7 +76,9 @@ static NSString *__strong const RootKey = @"root";
 @property (nonatomic, strong) NSMutableDictionary *changedObjects;
 @property (nonatomic, strong) NSMutableSet *removedObjects;
 @property (nonatomic, weak) NSDictionary *cachedJSON;
-@property (nonatomic, assign) pthread_rwlock_t rwLock;
+
+@property (nonatomic, strong) dispatch_queue_t lockQueue;
+@property (nonatomic, strong) NSString *lockQueueKey;
 
 @end
 
@@ -93,7 +100,9 @@ BOOL isFringeObjectClass(Class clas) {
 
 - (id)initCommon {
     if( (self = [super init]) ) {
-        pthread_rwlock_init(&_rwLock, NULL);
+        _lockQueueKey = [NSString stringWithFormat:@"com.ssttr.FringeObjectStoreLock.%p", self];
+        _lockQueue = dispatch_queue_create([_lockQueueKey UTF8String], DISPATCH_QUEUE_CONCURRENT);
+        dispatch_queue_set_specific(_lockQueue, (__bridge void *)_lockQueueKey, (__bridge void *)self, NULL);
         _objects = [NSMutableDictionary dictionaryWithCapacity:10];
         _changedObjects = [NSMutableDictionary dictionaryWithCapacity:10];
         _removedObjects = [NSMutableSet setWithCapacity:10];
@@ -137,7 +146,6 @@ BOOL isFringeObjectClass(Class clas) {
 }
 
 - (void)dealloc {
-    pthread_rwlock_destroy(&_rwLock);
     //NSLog(@"%p [%@ %@]", self, NSStringFromClass([self class]), NSStringFromSelector(_cmd));
 }
 
@@ -148,8 +156,9 @@ BOOL isFringeObjectClass(Class clas) {
 
     @synchronized(s_knownStores) {
         FringeWeakObject *weakStore = [s_knownStores objectForKey:root.uuid];
-        if( weakStore.object )
-            return weakStore.object;
+        id object = weakStore.object;
+        if( object )
+            return object;
 
         return [[FringeObjectStore alloc] initWithRootObject:root andCommitPath:path];
     }
@@ -162,8 +171,9 @@ BOOL isFringeObjectClass(Class clas) {
 
     @synchronized(s_knownStores) {
         FringeWeakObject *weakStore = [s_knownStores objectForKey:uuid];
-        if( weakStore.object )
-            return weakStore.object;
+        id object = weakStore.object;
+        if( object )
+            return object;
 
         NSString *fullPath = [FringeObjectStore fullPathForUUID:uuid andCommitPath:path];
         if( fullPath && [[[NSFileManager alloc] init] fileExistsAtPath:fullPath] )
@@ -182,8 +192,9 @@ BOOL isFringeObjectClass(Class clas) {
 
     @synchronized(s_knownStores) {
         FringeWeakObject *weakStore = [s_knownStores objectForKey:uuid];
-        if( weakStore.object )
-            return weakStore.object;
+        id object = weakStore.object;
+        if( object )
+            return object;
     }
     return [[FringeObjectStore alloc] initWithUUID:uuid andCommitPath:commitPath];
 }
@@ -257,9 +268,9 @@ BOOL isFringeObjectClass(Class clas) {
     }
     NSDictionary *json = [[[SBJsonParser alloc] init] objectWithString:rawStr];
     if( ! json || ! [json isKindOfClass:[NSDictionary class]] ) {
-        NSLog(@"Unparsable json in %@: %@", fullPath, rawStr);
+        lcl_log(lcl_cFringeData, lcl_vError, @"Unparsable json in %@: %@", fullPath, rawStr);
         [self delete:NULL];
-        [self cleanIndexes];
+        [FringeObjectStore cleanIndexes];
         return nil;
     }
 
@@ -307,8 +318,10 @@ BOOL isFringeObjectClass(Class clas) {
                 [allObjects setObject:weakObject forKey:key];
                 continue;
             }
-            else if( weakObject.object ) {
-                [allObjects setObject:weakObject.object forKey:key];
+
+            id object = weakObject.object;
+            if( object ) {
+                [allObjects setObject:object forKey:key];
                 continue;
             }
         }
@@ -403,6 +416,7 @@ BOOL isFringeObjectClass(Class clas) {
         if( ! [_objects objectForKey:object.uuid] )
             [_objects setObject:[FringeWeakObject weakObject:object] forKey:object.uuid];
         [_changedObjects setObject:object forKey:object.uuid];
+        object.store = self;
     }
 }
 
@@ -410,32 +424,6 @@ BOOL isFringeObjectClass(Class clas) {
 {
     if( object && [object.uuid length] )
         [_changedObjects setObject:object forKey:object.uuid];
-}
-
-- (void)beginTransaction {
-    [self lockWrite];
-    ++_transactionCounter;
-}
-
-- (void)commitTransaction:(NSError *__autoreleasing *)error {
-    if( ! _transactionCounter )
-        [self commit:error];
-    else if( --_transactionCounter == 0 ) {
-        [self commit:error];
-        [self unlockWrite];
-    }
-}
-
-- (void)rollback {
-    _transactionCounter = 0;
-    @autoreleasepool {
-        NSMutableArray *onDisk = [NSMutableArray arrayWithCapacity:[_changedObjects count]];
-        [_changedObjects enumerateKeysAndObjectsUsingBlock:^(id key, FringeObject *obj, BOOL *stop) {
-            if( obj.isOnDisk )
-                [onDisk addObject:key];
-        }];
-        [_changedObjects removeObjectsForKeys:onDisk];
-    }
 }
 
 - (void)updateIndexes
@@ -506,11 +494,10 @@ BOOL isFringeObjectClass(Class clas) {
         return NO;
 
     }
-    if( ! [_changedObjects count] || _transactionCounter )
+    if( ! [_changedObjects count] )
         return YES;
     
     @synchronized(self) {
-        NSError *error = nil;
         NSString *fullPath = [self fullCommitPath];
 
         // make sure the file exits before updating the indexes
@@ -524,42 +511,32 @@ BOOL isFringeObjectClass(Class clas) {
         if( ! [fm fileExistsAtPath:fullPath] )
             [fm createFileAtPath:fullPath contents:[@"{}" dataUsingEncoding:NSUTF8StringEncoding] attributes:nil];
 
-        NSString *data = nil;
-        @try {
-            [self lockWrite];
+        __block BOOL success = YES;
+        [self lockWriteSync:^{
+            NSError *error = nil;
             NSDictionary *allObjects = [self loadAllObjects];
             _cachedJSON = allObjects;
             [self updateIndexes];
-            data = [[[SBJsonWriter alloc] init] stringWithObject:allObjects];
-        }
-        @catch (NSException *exception) {
-            if( errorOut )
-                *errorOut = [NSError errorWithDomain:kFringeDataErrorDomain
-                                                code:FringeDataError_Exception
-                                            userInfo:@{ NSLocalizedDescriptionKey: NSLocalizedString(@"Caught Exception while updating indexes.", @"Fringe Data error") }];
-            NSLog(@"Caught exception while saving: %@ - %@ - %@ - %@", exception.name, exception.reason, exception.userInfo, [exception callStackSymbols]);
-            return NO;
-        }
-        @finally {
-            [self unlockWrite];
-        }
+            NSString *data = [[[SBJsonWriter alloc] init] stringWithObject:allObjects];
 
-        // finally, write it out. this is done after updateIndexes since that will actually change the content of _objects
-        if( ! [data writeToFile:fullPath atomically:YES encoding:NSUTF8StringEncoding error:&error] || error ) {
-            //NSLog(@"failed to write %@ - %@ (data: %@)", [self fullCommitPath], error, data);
-            if( errorOut )
-                *errorOut = error;
-            return NO;
-        }
-        [_objects enumerateKeysAndObjectsUsingBlock:^(id key, FringeWeakObject *obj, BOOL *stop) {
-            if( ! [key isEqualToString:RootKey] )
-                [(FringeObject*)obj.object setIsOnDisk:YES];
+            // finally, write it out. this is done after updateIndexes since that will actually change the content of _objects
+            if( ! [data writeToFile:fullPath atomically:YES encoding:NSUTF8StringEncoding error:&error] || error ) {
+                //NSLog(@"failed to write %@ - %@ (data: %@)", [self fullCommitPath], error, data);
+                if( errorOut )
+                    *errorOut = error;
+                success = NO;
+            }
+            [_objects enumerateKeysAndObjectsUsingBlock:^(id key, FringeWeakObject *obj, BOOL *stop) {
+                if( ! [key isEqualToString:RootKey] )
+                    [(FringeObject*)obj.object setIsOnDisk:YES];
+            }];
+            [_changedObjects removeAllObjects];
+
+            //NSLog(@"[%@ %@]: wrote %u bytes", NSStringFromClass([self class]), NSStringFromSelector(_cmd), [data length]);
+            //NSLog(@"[%@ %@]: %@", NSStringFromClass([self class]), NSStringFromSelector(_cmd), data);
         }];
-        [_changedObjects removeAllObjects];
 
-        //NSLog(@"[%@ %@]: wrote %u bytes", NSStringFromClass([self class]), NSStringFromSelector(_cmd), [data length]);
-        //NSLog(@"[%@ %@]: %@", NSStringFromClass([self class]), NSStringFromSelector(_cmd), data);
-        return YES;
+        return success;
     }
 }
 
@@ -598,7 +575,7 @@ BOOL isFringeObjectClass(Class clas) {
         [indexPaths enumerateKeysAndObjectsUsingBlock:^(NSString *propertyName, NSString *path, BOOL *stop) {
             NSError *removeError = nil;
             if( ! [fm removeItemAtPath:[[NSURL URLWithString:path] path] error:&removeError] )
-                NSLog(@"Unable to remove index @ %@ - %@", path, removeError);
+                lcl_log(lcl_cFringeData, lcl_vError, @"Unable to remove index @ %@ - %@", path, removeError);
         }];
 
         [s_knownStores removeObjectForKey:_rootUUID];
@@ -611,13 +588,10 @@ BOOL isFringeObjectClass(Class clas) {
     return YES;
 }
 
-- (void)cleanIndexes {
-    FringeObject *root = [self rootObject];
-    NSURL *indexPath = [[root class] defaultIndexPath];
-
++ (void)cleanIndexes {
     NSFileManager *fm = [[NSFileManager alloc] init];
     NSArray *resourceKeys = @[ NSURLIsReadableKey, NSURLIsRegularFileKey, NSURLIsSymbolicLinkKey ];
-    NSDirectoryEnumerator *dir = [fm enumeratorAtURL:[indexPath fileURL]
+    NSDirectoryEnumerator *dir = [fm enumeratorAtURL:[[NSURL URLWithLibrary:@"FringeData"] fileURL]
                           includingPropertiesForKeys:resourceKeys
                                              options:NSDirectoryEnumerationSkipsHiddenFiles
                                         errorHandler:^BOOL(NSURL *url, NSError *error) {
@@ -637,26 +611,32 @@ BOOL isFringeObjectClass(Class clas) {
         NSURL *dest = [url URLByResolvingSymlinksInPath];
         if( ! [fm fileExistsAtPath:[dest path]] )
             if( ! [fm removeItemAtURL:url error:&error] )
-                NSLog(@"Unable to remove index @ %@ - %@", url, error);
+                lcl_log(lcl_cFringeData, lcl_vError, @"Unable to remove index @ %@ - %@", url, error);
     }
 }
 
-- (void)lockRead {
-    pthread_rwlock_rdlock(&_rwLock);
+- (void)lockReadSync:(void(^)())readBlock
+{
+	if( dispatch_get_specific((__bridge void *)_lockQueueKey) )
+        readBlock();
+    else
+        dispatch_sync(_lockQueue, readBlock);
 }
 
-- (void)unlockRead {
-    pthread_rwlock_unlock(&_rwLock);
+- (void)lockWriteSync:(void(^)())writeBlock
+{
+	if( dispatch_get_specific((__bridge void *)_lockQueueKey) )
+        writeBlock();
+    else
+        dispatch_barrier_sync(_lockQueue, writeBlock);
 }
 
-- (void)lockWrite {
-    if( _transactionCounter == 0 )
-        pthread_rwlock_wrlock(&_rwLock);
-}
-
-- (void)unlockWrite {
-    if( _transactionCounter == 0 )
-        pthread_rwlock_unlock(&_rwLock);
+- (void)lockWriteAsync:(void(^)())writeBlock
+{
+	if( dispatch_get_specific((__bridge void *)_lockQueueKey) )
+        writeBlock();
+    else
+        dispatch_barrier_async(_lockQueue, writeBlock);
 }
 
 @end

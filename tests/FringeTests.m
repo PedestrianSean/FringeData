@@ -143,8 +143,10 @@ int main(int c, char **v)
         NSLog(@"didn't accept unsupported property type :)");
     }
 
+    FringeObjectStore *store1 = [FringeObjectStore storeWithPath:nil];
+
     NSLog(@"testing initialization");
-    TestObject *test1 = [[TestObject alloc] initWithDictionary:@{ @"uuid": @"UUID-1", @"stringProperty": @"it's a string" } inStore:nil];
+    TestObject *test1 = [[TestObject alloc] initWithDictionary:@{ @"uuid": @"UUID-1", @"stringProperty": @"it's a string" } inStore:store1];
     NSLog(@"test1: %@", test1);
     FAIL_IF( ! [test1.stringProperty isEqualToString:@"it's a string"], @"test1.stringProperty didn't initialize - %@", test1.stringProperty);
 
@@ -188,13 +190,17 @@ int main(int c, char **v)
     }
     FAIL_IF(test1.weakStringProperty, @"weak property not released");
 
+    FringeObjectStore *store2 = [FringeObjectStore storeWithPath:nil];
+
     NSLog(@"testing object over-reuse");
-    TestObject *test2 = [[TestObject alloc] initWithDictionary:@{ @"uuid": @"UUID-1", @"int32Property": @(5) } inStore:nil];
+    TestObject *test2 = [[TestObject alloc] initWithDictionary:@{ @"uuid": @"UUID-1", @"int32Property": @(5) } inStore:store2];
     NSLog(@"test2: %@", test2);
     FAIL_IF( test2.int32Property != 5, @"test2.intProperty != 5");
 
+    FringeObjectStore *store3 = [FringeObjectStore storeWithPath:nil];
+
     NSLog(@"testing subclassing");
-    TestObjectSubclass *test3 = [[TestObjectSubclass alloc] initWithDictionary:@{ @"uuid": @"UUID-3", @"int32Property": @(5), @"subclassPropertyString": @"boo" } inStore:nil];
+    TestObjectSubclass *test3 = [[TestObjectSubclass alloc] initWithDictionary:@{ @"uuid": @"UUID-3", @"int32Property": @(5), @"subclassPropertyString": @"boo" } inStore:store3];
     NSLog(@"test3: %@", test3);
     FAIL_IF( ! [test3.subclassPropertyString isEqualToString:@"boo"], @"test3.subclassPropertyString != \"boo\"");
     FAIL_IF( test3.int32Property != 5, @"test3.intProperty != 5");

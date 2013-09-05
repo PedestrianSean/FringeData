@@ -21,7 +21,6 @@ NS_REQUIRES_PROPERTY_DEFINITIONS
 @property (nonatomic, readonly) NSString *uuid;
 
 + (NSURL*)defaultCommitPath;
-+ (NSURL*)defaultIndexPath;
 + (NSSet*)indexedPropertyNames;
 + (NSURL*)indexURLForProperty:(NSString*)name withValue:(id)value forObject:(FringeObject*)object;
 
