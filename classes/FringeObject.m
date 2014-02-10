@@ -30,11 +30,14 @@ NSString *makeFileNameSafe(NSString *fileName)
                                                                                      kCFStringEncodingUTF8)));
     if( ! newString )
         return @"";
-    if( [newString lengthOfBytesUsingEncoding:NSUTF8StringEncoding] > NAME_MAX )
-        newString = [NSString stringWithFormat:@"%d:%@:%@",
-                     (int)[newString hash],
-                     [newString substringWithRange:NSMakeRange(0, 20)],
-                     [newString substringWithRange:NSMakeRange([newString length] - 20, 20)]];
+    if( [newString lengthOfBytesUsingEncoding:NSUTF8StringEncoding] > NAME_MAX ) {
+        NSRange range1 = [newString rangeOfComposedCharacterSequenceAtIndex:20];
+        NSRange range2 = [newString rangeOfComposedCharacterSequenceAtIndex:([newString length] - 20)];
+        newString = [NSString stringWithFormat:@"%llu:%@:%@",
+                     (unsigned long long)[newString hash],
+                     [newString substringWithRange:NSMakeRange(0, range1.location)],
+                     [newString substringWithRange:NSMakeRange(range2.location, [newString length] - range2.location)]];
+    }
     return newString;
 }
 
