@@ -229,7 +229,7 @@ NSString *upperCaseFirst(NSString *str) {
 
         [str appendFormat:@"%@: ", propNameStr];
         switch (propertyMetaData->type) {
-            case '@':
+            case _C_ID:
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
                 if( isFringeObjectClass(propertyMetaData->objectType) )
@@ -239,31 +239,32 @@ NSString *upperCaseFirst(NSString *str) {
 #pragma clang diagnostic pop
                 break;
 
-            case 'Q':
+            case _C_ULNG_LNG:
                 APPEND_PRIMITIVE(uint64_t, @"%llu");
                 break;
 
-            case 'q':
+            case _C_LNG_LNG:
                 APPEND_PRIMITIVE(int64_t, @"%lld");
                 break;
 
-            case 'I':
+            case _C_UINT:
                 APPEND_PRIMITIVE(uint32_t, @"%u");
                 break;
 
-            case 'i':
+            case _C_INT:
                 APPEND_PRIMITIVE(int32_t, @"%d");
                 break;
 
-            case 'd':
+            case _C_DBL:
                 APPEND_PRIMITIVE(double, @"%g");
                 break;
 
-            case 'f':
+            case _C_FLT:
                 APPEND_PRIMITIVE(float, @"%g");
                 break;
 
-            case 'c':
+            case _C_CHR:
+            case _C_BOOL:
                 APPEND_PRIMITIVE(char, @"%hhd");
                 break;
 
@@ -380,7 +381,7 @@ NSString *upperCaseFirst(NSString *str) {
 
         propertyMetaData->type = [propTypeStr characterAtIndex:0];
         switch( propertyMetaData->type ) {
-            case '@':
+            case _C_ID:
             {
                 NSString *typeName = [propTypeStr substringFromIndex:1];
                 if( [typeName length] > 2 && [typeName characterAtIndex:0] == '"' )
@@ -547,49 +548,50 @@ NSString *upperCaseFirst(NSString *str) {
                 break;
             }
 
-            case 'Q':
+            case _C_ULNG_LNG:
                 getterImpl = getterImplementationUInt64;
                 getterTypes = "Q@:";
                 setterImpl = setterImplementationUInt64;
                 setterTypes = "v@:Q";
                 break;
 
-            case 'q':
+            case _C_LNG_LNG:
                 getterImpl = getterImplementationInt64;
                 getterTypes = "q@:";
                 setterImpl = setterImplementationInt64;
                 setterTypes = "v@:q";
                 break;
 
-            case 'I':
+            case _C_UINT:
                 getterImpl = getterImplementationUInt32;
                 getterTypes = "I@:";
                 setterImpl = setterImplementationUInt32;
                 setterTypes = "v@:I";
                 break;
 
-            case 'i':
+            case _C_INT:
                 getterImpl = getterImplementationInt32;
                 getterTypes = "i@:";
                 setterImpl = setterImplementationInt32;
                 setterTypes = "v@:i";
                 break;
 
-            case 'd':
+            case _C_DBL:
                 getterImpl = getterImplementationDouble;
                 getterTypes = "d@:";
                 setterImpl = setterImplementationDouble;
                 setterTypes = "v@:d";
                 break;
 
-            case 'f':
+            case _C_FLT:
                 getterImpl = getterImplementationFloat;
                 getterTypes = "f@:";
                 setterImpl = setterImplementationFloat;
                 setterTypes = "v@:f";
                 break;
 
-            case 'c':
+            case _C_CHR:
+            case _C_BOOL:
                 getterImpl = getterImplementationBool;
                 getterTypes = "c@:";
                 setterImpl = setterImplementationBool;
