@@ -34,24 +34,38 @@
 
 - (NSString*)jsonStringForKey:(NSString*)key
 {
-    if( ! self ) return nil;
+    return [self jsonStringForKey:key withDefault:nil];
+}
+
+- (NSString*)jsonStringForKey:(NSString*)key withDefault:(NSString*)defaultValue
+{
+    if( ! self ) return defaultValue;
     id object = [self jsonObjectForKey:key];
     if( [object isKindOfClass:[NSString class]] )
         return object;
     if( [object isKindOfClass:[NSArray class]] || [object isKindOfClass:[NSDictionary class]] )
-        return nil;
-    return [object description];
+        return defaultValue;
+    if( object )
+        return [object description];
+    return defaultValue;
 }
 
 - (NSString*)jsonStringAt:(NSUInteger)index
 {
-    if( ! self ) return nil;
+    return [self jsonStringAt:index withDefault:nil];
+}
+
+- (NSString*)jsonStringAt:(NSUInteger)index withDefault:(NSString*)defaultValue
+{
+    if( ! self ) return defaultValue;
     id object = [self jsonObjectAt:index];
     if( [object isKindOfClass:[NSString class]] )
         return object;
     if( [object isKindOfClass:[NSArray class]] || [object isKindOfClass:[NSDictionary class]] )
-        return nil;
-    return [object description];
+        return defaultValue;
+    if( object )
+        return [object description];
+    return defaultValue;
 }
 
 - (BOOL)jsonBoolForKey:(NSString*)key

@@ -13,7 +13,9 @@
 - (NSObject*)jsonObjectAt:(NSUInteger)index;
 
 - (NSString*)jsonStringForKey:(NSString*)key;
+- (NSString*)jsonStringForKey:(NSString*)key withDefault:(NSString*)defaultValue;
 - (NSString*)jsonStringAt:(NSUInteger)index;
+- (NSString*)jsonStringAt:(NSUInteger)index withDefault:(NSString*)defaultValue;
 
 #define JSON_SAFE_PRIMITIVE(NAME, TYPE) \
 - (TYPE)json##NAME##ForKey:(NSString*)key; \
