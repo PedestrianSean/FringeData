@@ -575,7 +575,7 @@ BOOL isFringeObjectClass(Class clas) {
         NSDictionary *indexPaths = [[self rootObject] indexPaths];
         [indexPaths enumerateKeysAndObjectsUsingBlock:^(NSString *propertyName, NSString *path, BOOL *stop) {
             NSError *removeError = nil;
-            if( ! [fm removeItemAtPath:[[NSURL URLWithString:path] path] error:&removeError] )
+            if( ! [fm removeItemAtPath:[(NSURL*)[NSURL URLWithString:path] path] error:&removeError] )
                 lcl_log(lcl_cFringeData, lcl_vError, @"Unable to remove index @ %@ - %@", path, removeError);
         }];
 
