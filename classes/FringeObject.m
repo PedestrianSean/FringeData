@@ -1258,16 +1258,20 @@ PRIMITIVE_PROPERTY(int32_t, Int32);
     GET_NSSET_UUIDS(NO);
     NSMutableArray *valuesUUIDs = [NSMutableArray arrayWithCapacity:[values count]];
     NSMutableArray *removedUUIDs = [NSMutableArray arrayWithCapacity:[indexes count]];
+    NSMutableArray *addedUUIDs = [NSMutableArray arrayWithCapacity:[indexes count]];
     [indexes enumerateIndexesUsingBlock:^(NSUInteger idx, BOOL *stop) {
         [removedUUIDs addObject:[uuids objectAtIndex:idx]];
     }];
     for( FringeObject *fo in values ) {
         [self.store addObject:fo];
         [valuesUUIDs addObject:fo.uuid];
+        [addedUUIDs addObject:fo.uuid];
     }
     [uuids replaceObjectsAtIndexes:indexes withObjects:valuesUUIDs];
-    for( NSString *uuid in removedUUIDs )
-        [self.store removeObjectWithUUID:uuid];
+    for( NSString *uuid in removedUUIDs ) {
+        if( [addedUUIDs indexOfObject:uuid] == NSNotFound )
+            [self.store removeObjectWithUUID:uuid];
+    }
     [self setChanged];
     SYNC_STOP_SET();
 }

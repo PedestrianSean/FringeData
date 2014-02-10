@@ -415,6 +415,7 @@ BOOL isFringeObjectClass(Class clas) {
     if( object && [object.uuid length] ) {
         if( ! [_objects objectForKey:object.uuid] )
             [_objects setObject:[FringeWeakObject weakObject:object] forKey:object.uuid];
+        [_removedObjects removeObject:object.uuid];
         [_changedObjects setObject:object forKey:object.uuid];
         object.store = self;
     }
