@@ -127,8 +127,8 @@
 		8B4B400417166531000FA07E /* NSURL+ApplicationPath.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSURL+ApplicationPath.m"; sourceTree = "<group>"; };
 		8B4B40081716654C000FA07E /* NSData+Base64.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "NSData+Base64.h"; sourceTree = "<group>"; };
 		8B4B40091716654C000FA07E /* NSData+Base64.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSData+Base64.m"; sourceTree = "<group>"; };
-		8B4B4015171669BF000FA07E /* NSString+URLEncode.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "NSString+URLEncode.h"; path = "../../../../svn/locker-ios/release3.1/Givit/Utilities/Foundation/NSString+URLEncode.h"; sourceTree = "<group>"; };
-		8B4B4016171669BF000FA07E /* NSString+URLEncode.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = "NSString+URLEncode.m"; path = "../../../../svn/locker-ios/release3.1/Givit/Utilities/Foundation/NSString+URLEncode.m"; sourceTree = "<group>"; };
+		8B4B4015171669BF000FA07E /* NSString+URLEncode.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "NSString+URLEncode.h"; sourceTree = "<group>"; };
+		8B4B4016171669BF000FA07E /* NSString+URLEncode.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSString+URLEncode.m"; sourceTree = "<group>"; };
 		8B4B401F17166C43000FA07E /* FringeDataTests */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = FringeDataTests; sourceTree = BUILT_PRODUCTS_DIR; };
 		8B4B402017166C43000FA07E /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
@@ -433,6 +433,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 6.1;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
+				USER_HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/submodules/SBJSON/src/main/objc";
 			};
 			name = Debug;
 		};
@@ -455,6 +456,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 6.1;
 				SDKROOT = iphoneos;
+				USER_HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/submodules/SBJSON/src/main/objc";
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;

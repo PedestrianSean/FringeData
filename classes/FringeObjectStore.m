@@ -12,7 +12,7 @@
 #import <pthread.h>
 
 #import "FringeObject.h"
-#import "SBJson/SBJson.h"
+#import "SBJson.h"
 #import "FringeWeakObject.h"
 #import "NSURL+ApplicationPath.h"
 
