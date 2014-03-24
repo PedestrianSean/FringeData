@@ -12,7 +12,7 @@
 #import <pthread.h>
 
 #import "FringeObject.h"
-#import "SBJson.h"
+#import "SBJson4.h"
 #import "FringeWeakObject.h"
 #import "NSURL+ApplicationPath.h"
 
@@ -260,15 +260,13 @@ BOOL isFringeObjectClass(Class clas) {
 
     NSString *fullPath = [self fullCommitPath];
     NSError *error = nil;
-    NSString *rawStr = [NSString stringWithContentsOfFile:fullPath
-                                                 encoding:NSUTF8StringEncoding
-                                                    error:&error];
-    if( ! [rawStr length] ) {
+    NSData *raw = [NSData dataWithContentsOfFile:fullPath options:0 error:&error];
+    if( ! [raw length] ) {
         return nil;
     }
-    NSDictionary *json = [[[SBJsonParser alloc] init] objectWithString:rawStr];
+    NSDictionary *json = [NSJSONSerialization JSONObjectWithData:raw options:NSJSONReadingMutableContainers error:&error];
     if( ! json || ! [json isKindOfClass:[NSDictionary class]] ) {
-        lcl_log(lcl_cFringeData, lcl_vError, @"Unparsable json in %@: %@", fullPath, rawStr);
+        lcl_log(lcl_cFringeData, lcl_vError, @"Unparsable json in %@ - %@: %@", fullPath, error, [[NSString alloc] initWithData:raw encoding:NSUTF8StringEncoding]);
         [self delete:NULL];
         [FringeObjectStore cleanIndexes];
         return nil;
@@ -518,7 +516,7 @@ BOOL isFringeObjectClass(Class clas) {
             NSDictionary *allObjects = [self loadAllObjects];
             _cachedJSON = allObjects;
             [self updateIndexes];
-            NSString *data = [[[SBJsonWriter alloc] init] stringWithObject:allObjects];
+            NSString *data = [[[SBJson4Writer alloc] init] stringWithObject:allObjects];
 
             // finally, write it out. this is done after updateIndexes since that will actually change the content of _objects
             if( ! [data writeToFile:fullPath atomically:YES encoding:NSUTF8StringEncoding error:&error] || error ) {
