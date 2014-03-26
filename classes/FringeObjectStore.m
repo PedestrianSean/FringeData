@@ -259,11 +259,12 @@ BOOL isFringeObjectClass(Class clas) {
         return _cachedJSON;
 
     NSString *fullPath = [self fullCommitPath];
+    if( ! fullPath )
+        return nil;
     NSError *error = nil;
     NSData *raw = [NSData dataWithContentsOfFile:fullPath options:0 error:&error];
-    if( ! [raw length] ) {
+    if( ! [raw length] )
         return nil;
-    }
     NSDictionary *json = [NSJSONSerialization JSONObjectWithData:raw options:NSJSONReadingMutableContainers error:&error];
     if( ! json || ! [json isKindOfClass:[NSDictionary class]] ) {
         lcl_log(lcl_cFringeData, lcl_vError, @"Unparsable json in %@ - %@: %@", fullPath, error, [[NSString alloc] initWithData:raw encoding:NSUTF8StringEncoding]);
