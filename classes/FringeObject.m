@@ -21,7 +21,7 @@ static NSMutableDictionary *__strong s_registeredClasses = nil;
 
 extern BOOL isFringeObjectClass(Class clas);
 
-NSString *makeFileNameSafe(NSString *fileName)
+NSString *fringedata_makeFileNameSafe(NSString *fileName)
 {
     NSString *newString = CFBridgingRelease((CFURLCreateStringByAddingPercentEscapes(kCFAllocatorDefault,
                                                                                      (__bridge CFStringRef)fileName,
@@ -41,7 +41,7 @@ NSString *makeFileNameSafe(NSString *fileName)
     return newString;
 }
 
-NSString *makeFileNameUnSafe(NSString *fileName)
+NSString *fringedata_makeFileNameUnSafe(NSString *fileName)
 {
     NSString *newString = CFBridgingRelease((CFURLCreateStringByReplacingPercentEscapes(kCFAllocatorDefault,
                                                                                         (__bridge CFStringRef)fileName,
