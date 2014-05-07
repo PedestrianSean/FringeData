@@ -9,7 +9,7 @@ Pod::Spec.new do |spec|
                  :tag => 'v1.0' }
 
   spec.source_files = 'classes/**/*.{h,m}'
-  spec.public_header_files = 'classes/FringeDataUtils.h', 'classes/FringeObject.h', 'classes/FringeObjectStore.h'
+  spec.public_header_files = 'classes/FringeDataUtils.h', 'classes/FringeObject.h', 'classes/FringeObjectStore.h', 'classes/Utilities/*.h'
   spec.requires_arc = true
   spec.dependency 'SBJson', '~> 4'
   spec.ios.deployment_target = '6.0'

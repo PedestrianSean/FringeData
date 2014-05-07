@@ -55,10 +55,18 @@ extern NSString *const kFringeDataItemDeleted;
 /**
  Gets all root FringeObjects at `path`. Generally used on an index directory.
  @param path The directory to scan for FringeObjects
- @param limit the maximum number of FringeObjects to return. Order is not guarenteed.
+ @param limit the maximum number of FringeObjects to return. Order is not guarenteed. Send 0 to retrieve all objects.
  @return An array of the objects found, possibly empty, never nil
  */
 + (NSArray*)rootObjectsAtPath:(NSURL*)path limit:(NSUInteger)limit;
+
+/**
+ Gets all root FringeObjects at `paths`. Useful for multi-index lookups.
+ @param paths The directories (as NSString*) to scan for FringeObjects
+ @param limit the maximum number of FringeObjects to return. Order is not guarenteed. Send 0 to retrieve all objects.
+ @return An array of the objects found, possibly empty, never nil
+ */
++ (NSArray*)rootObjectsAtAllPaths:(NSArray*)paths limit:(NSUInteger)limit
 
 /**
  Removes `object` from its FringeObjectStore. If `object` is the root object, the store will be deleted.

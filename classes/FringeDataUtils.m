@@ -106,7 +106,7 @@ NSString *const kFringeDataItemDeleted = @"FringeDataItemDeleted";
             id root = store.rootObject;
             if( root )
                 [roots addObject:store.rootObject];
-            if( [roots count] >= limit )
+            if( limit && [roots count] >= limit )
                 return roots;
         }
     }
@@ -171,7 +171,7 @@ NSString *const kFringeDataItemDeleted = @"FringeDataItemDeleted";
             FringeObjectStore *store = [FringeObjectStore storeWithUUID:[file stringByDeletingPathExtension]
                                                                  atPath:[[url path] stringByDeletingLastPathComponent]];
             [roots addObject:store.rootObject];
-            if( [roots count] >= limit )
+            if( limit && [roots count] >= limit )
                 return roots;
         }
     }

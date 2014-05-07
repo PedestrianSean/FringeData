@@ -71,12 +71,12 @@ NS_REQUIRES_PROPERTY_DEFINITIONS
  */
 + (NSURL*)defaultCommitPath;
 /**
- The default implementation returns `nil`. This must be implmented for any root object.
+ The default implementation returns `nil`. This should be implmented for any root object.
  @return the (NSString*) names of the properties that should be indexed.
  */
 + (NSSet*)indexedPropertyNames;
 /**
- The default implementation returns `nil`. This must be implmented for any root object.
+ The default implementation returns `nil`. This should be implmented for any root object.
  @param name The name of the property that will be indexed.
  @param value The value of the property.
  @param object The FringeObject the property belongs to.
@@ -90,10 +90,17 @@ NS_REQUIRES_PROPERTY_DEFINITIONS
 - (void)setDefaultValues;
 
 /**
- This is the preferred method to call when creating a new FringeObject instance.
+ Only use this method when creating a root object that implements defaultCommitPath.
+ A FringeObjectStore will be automatically created for you.
+ */
+- (id)init;
+
+/**
+ Use this method when creating a non-root object, or when creating a root object and you already have a FringeObjectStore to add it to.
  @param store The FringeObjectStore to which this object belongs
  */
 - (id)initWithStore:(FringeObjectStore*)store;
+
 /**
  Primarily for internal use only. Can be overridden to modify the dictionary on creation.
  @param dictionary The NSDictionary that contains the values parsed from the FringeObjectStore
