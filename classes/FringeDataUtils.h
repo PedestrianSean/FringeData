@@ -66,7 +66,7 @@ extern NSString *const kFringeDataItemDeleted;
  @param limit the maximum number of FringeObjects to return. Order is not guarenteed. Send 0 to retrieve all objects.
  @return An array of the objects found, possibly empty, never nil
  */
-+ (NSArray*)rootObjectsAtAllPaths:(NSArray*)paths limit:(NSUInteger)limit
++ (NSArray*)rootObjectsAtAllPaths:(NSArray*)paths limit:(NSUInteger)limit;
 
 /**
  Removes `object` from its FringeObjectStore. If `object` is the root object, the store will be deleted.

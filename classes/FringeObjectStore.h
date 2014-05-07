@@ -21,7 +21,7 @@ typedef NS_ENUM(NSUInteger, FringeDataErrorCode) {
     FringeDataError_NoCommitPath = 1000,
     /** Returned when the root object is `nil` */
     FringeDataError_NoRootObject
-} FringeDataErrorCode;
+};
 
 /**
  FringeObjectStore represents a single data file and N indexes. Each store contains exactly one root object, which in
